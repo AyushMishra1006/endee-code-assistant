@@ -60,39 +60,27 @@ class RAGHandler:
         if not context:
             return "No relevant code found for your question."
 
-        # Create prompt with enhanced structure for better answers
-        prompt = f"""You are an expert Python code analyst for the Endee code intelligence system.
+        # Create balanced prompt - concise with smart insights
+        prompt = f"""You are a Python code analyst. Answer the question concisely but intelligently.
 
-TASK: Answer the user's question using ONLY the provided code snippets. Be informative but accurate.
-
-RULES:
-1. NEVER invent or assume functionality not shown in provided code
-2. Always cite specific code locations (file names, line references when possible)
-3. Explain relationships between methods/classes when relevant
-4. Highlight important implementation details
-5. If code is incomplete or unclear, acknowledge it
-
-CODE SNIPPETS PROVIDED:
+CODE CONTEXT:
 {context}
 
-USER QUESTION: {question}
+QUESTION: {question}
 
-RESPONSE FORMAT:
-## Answer
-[2-3 sentence high-level explanation of what the code does]
+GUIDELINES:
+1. Answer directly (2-3 sentences max)
+2. Explain how it works with brief code references
+3. Add 1 key insight or consideration if relevant
+4. NEVER invent functionality not in provided code
+5. Keep it conversational, not verbose
 
-## Implementation Details
-[Detailed explanation with specific code references and how it works]
+Format:
+[Direct answer about what the code does]
 
-## Key Points
-- Point 1: [with context/reference]
-- Point 2: [with context/reference]
-- Point 3: [with context/reference]
+[Brief explanation of how/why it works - reference code files/methods]
 
-## Related Components
-[Other methods/classes involved, if visible in provided code]
-
-CONSTRAINT: Only use information from the provided code snippets. Never hallucinate or invent functionality."""
+[Optional: 1 key insight or gotcha if relevant]"""
 
         try:
             response = self.model.generate_content(prompt)
