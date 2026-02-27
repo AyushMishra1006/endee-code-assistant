@@ -125,67 +125,67 @@ with st.sidebar:
                     progress_container.info("📥 Cloning repository...")
                     repo_path, error = clone_repository(repo_url)
 
-                if error:
-                    status_container.error(f"❌ Error: {error}")
-                else:
-                    # Find Python files
-                    progress_container.info("🔍 Finding Python files...")
-                    python_files = find_python_files(repo_path)
-
-                    if not python_files:
-                        status_container.error("❌ No Python files found in repository")
-                        cleanup_repo(repo_path)
+                    if error:
+                        status_container.error(f"❌ Error: {error}")
                     else:
-                        # Parse repository
-                        progress_container.info(f"📝 Parsing {len(python_files)} files...")
-                        chunks = parse_repository(repo_path, python_files)
+                        # Find Python files
+                        progress_container.info("🔍 Finding Python files...")
+                        python_files = find_python_files(repo_path)
 
-                        if not chunks:
-                            status_container.error("❌ Could not extract code chunks")
+                        if not python_files:
+                            status_container.error("❌ No Python files found in repository")
                             cleanup_repo(repo_path)
                         else:
-                            # Create embeddings
-                            progress_container.info("🧠 Generating embeddings...")
-                            chunks_dict = [chunk_for_storage(chunk) for chunk in chunks]
-                            texts = [c['combined_text'] for c in chunks_dict]
-                            embeddings = embed_texts(texts)
+                            # Parse repository
+                            progress_container.info(f"📝 Parsing {len(python_files)} files...")
+                            chunks = parse_repository(repo_path, python_files)
 
-                            # Filter valid pairs
-                            valid_pairs = [
-                                (chunk, emb) for chunk, emb in zip(chunks_dict, embeddings)
-                                if emb is not None
-                            ]
-
-                            if not valid_pairs:
-                                status_container.error("❌ Could not generate embeddings")
+                            if not chunks:
+                                status_container.error("❌ Could not extract code chunks")
+                                cleanup_repo(repo_path)
                             else:
-                                # Index in vector DB
-                                progress_container.info("💾 Indexing in vector database...")
-                                reset_vector_db()
-                                vector_db = get_vector_db()
-                                valid_chunks = [p[0] for p in valid_pairs]
-                                valid_embeddings = [p[1] for p in valid_pairs]
-                                success = vector_db.add_chunks(valid_chunks, valid_embeddings)
+                                # Create embeddings
+                                progress_container.info("🧠 Generating embeddings...")
+                                chunks_dict = [chunk_for_storage(chunk) for chunk in chunks]
+                                texts = [c['combined_text'] for c in chunks_dict]
+                                embeddings = embed_texts(texts)
 
-                                if success:
-                                    # SAVE TO CACHE for future analysis
-                                    progress_container.info("💾 Saving to cache...")
-                                    cache.save_analysis(repo_url, valid_chunks, valid_embeddings)
+                                # Filter valid pairs
+                                valid_pairs = [
+                                    (chunk, emb) for chunk, emb in zip(chunks_dict, embeddings)
+                                    if emb is not None
+                                ]
 
-                                    st.session_state.repo_analyzed = True
-                                    st.session_state.chunks_count = len(valid_chunks)
-                                    progress_container.empty()
-                                    status_container.markdown(
-                                        f'<div class="success-box">'
-                                        f'✅ Successfully analyzed {len(valid_chunks)} code chunks!'
-                                        f'<br>💾 Cached for future use (instant re-analysis)'
-                                        f'</div>',
-                                        unsafe_allow_html=True
-                                    )
+                                if not valid_pairs:
+                                    status_container.error("❌ Could not generate embeddings")
                                 else:
-                                    status_container.error("❌ Failed to index chunks")
+                                    # Index in vector DB
+                                    progress_container.info("💾 Indexing in vector database...")
+                                    reset_vector_db()
+                                    vector_db = get_vector_db()
+                                    valid_chunks = [p[0] for p in valid_pairs]
+                                    valid_embeddings = [p[1] for p in valid_pairs]
+                                    success = vector_db.add_chunks(valid_chunks, valid_embeddings)
 
-                            cleanup_repo(repo_path)
+                                    if success:
+                                        # SAVE TO CACHE for future analysis
+                                        progress_container.info("💾 Saving to cache...")
+                                        cache.save_analysis(repo_url, valid_chunks, valid_embeddings)
+
+                                        st.session_state.repo_analyzed = True
+                                        st.session_state.chunks_count = len(valid_chunks)
+                                        progress_container.empty()
+                                        status_container.markdown(
+                                            f'<div class="success-box">'
+                                            f'✅ Successfully analyzed {len(valid_chunks)} code chunks!'
+                                            f'<br>💾 Cached for future use (instant re-analysis)'
+                                            f'</div>',
+                                            unsafe_allow_html=True
+                                        )
+                                    else:
+                                        status_container.error("❌ Failed to index chunks")
+
+                                cleanup_repo(repo_path)
 
             except Exception as e:
                 status_container.error(f"❌ Error: {str(e)}")
