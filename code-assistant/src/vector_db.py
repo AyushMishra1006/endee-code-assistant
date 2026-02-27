@@ -28,7 +28,7 @@ class VectorDatabase:
     def initialize(self):
         """Initialize Endee vector database"""
         self.initialized = True
-        print("✅ Vector database initialized (persistent mode with HNSW optimization)")
+        print("[OK] Vector database initialized (persistent mode with HNSW optimization)")
 
     def _load_from_disk(self) -> bool:
         """Load vector database from persistent storage"""
@@ -44,7 +44,7 @@ class VectorDatabase:
                     metadata = json.load(f)
                     self.chunk_ids = metadata.get("chunk_ids", [])
 
-                print(f"✅ Loaded {len(self.db)} chunks from persistent storage")
+                print(f"[OK] Loaded {len(self.db)} chunks from persistent storage")
                 return True
         except Exception as e:
             print(f"Note: Starting fresh vector database: {e}")
@@ -112,7 +112,7 @@ class VectorDatabase:
             # Persist to disk
             success = self._save_to_disk()
 
-            print(f"✅ Indexed {len(chunks)} chunks (total: {len(self.db)})")
+            print(f"[OK] Indexed {len(chunks)} chunks (total: {len(self.db)})")
             return success
 
         except Exception as e:
