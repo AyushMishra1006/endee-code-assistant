@@ -55,7 +55,7 @@ class RAGHandler:
             return "Error: Gemini API not configured. Please set GEMINI_API_KEY."
 
         # Build context from search results WITHOUT truncation
-        context = self._build_context(search_results, max_chunk_chars=None)
+        context = self._build_context(search_results, max_chars=None)
 
         if not context:
             return "No relevant code found for your question."
