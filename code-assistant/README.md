@@ -1,12 +1,3 @@
----
-title: Code Documentation Assistant
-emoji: magnifying_glass
-colorFrom: blue
-colorTo: purple
-sdk: docker
-pinned: false
----
-
 # Code Documentation Assistant
 
 ## Project Overview
