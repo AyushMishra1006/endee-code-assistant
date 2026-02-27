@@ -15,7 +15,7 @@ CLONE_TIMEOUT = 60  # seconds
 
 def validate_github_url(url: str) -> bool:
     """Validate GitHub URL format"""
-    return url.startswith("https://github.com/") and url.endswith(".git") or url.count("/") >= 2
+    return url.startswith("https://github.com/") and (url.endswith(".git") or url.count("/") >= 4)
 
 
 def get_repo_size(path: str) -> int:
@@ -52,8 +52,8 @@ def clone_repository(repo_url: str) -> tuple[str, Optional[str]]:
     temp_dir = tempfile.mkdtemp(prefix="code_assistant_")
 
     try:
-        # Clone repo
-        git.Repo.clone_from(repo_url, temp_dir, depth=1, timeout=CLONE_TIMEOUT)
+        # Clone repo (remove timeout - not supported by GitPython)
+        git.Repo.clone_from(repo_url, temp_dir, depth=1)
 
         # Check size
         repo_size = get_repo_size(temp_dir)
