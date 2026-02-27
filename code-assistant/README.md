@@ -1,3 +1,13 @@
+---
+title: Code Documentation Assistant
+emoji: 🔍
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_file: main.py
+pinned: false
+---
+
 # Code Documentation Assistant
 
 ## Project Overview
