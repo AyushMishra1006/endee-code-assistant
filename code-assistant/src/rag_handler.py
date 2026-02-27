@@ -38,15 +38,15 @@ class RAGHandler:
         self,
         question: str,
         search_results: list[dict],
-        max_chunk_chars: int = 300
+        max_chunk_chars: int = None  # FIXED: No truncation (use full context)
     ) -> str:
         """
-        Generate answer using Gemini with code context
+        Generate answer using Gemini with code context - FULL CONTEXT (no truncation)
 
         Args:
             question: User's question about code
             search_results: List of relevant code chunks from search
-            max_chunk_chars: Max characters per chunk to include in context
+            max_chunk_chars: DEPRECATED - no longer truncates (uses full context)
 
         Returns:
             Generated answer
@@ -54,8 +54,8 @@ class RAGHandler:
         if not self.initialized:
             return "Error: Gemini API not configured. Please set GEMINI_API_KEY."
 
-        # Build context from search results
-        context = self._build_context(search_results, max_chunk_chars)
+        # Build context from search results WITHOUT truncation
+        context = self._build_context(search_results, max_chunk_chars=None)
 
         if not context:
             return "No relevant code found for your question."
@@ -76,8 +76,8 @@ Please provide a clear, concise answer that directly references the code snippet
         except Exception as e:
             return f"Error generating answer: {str(e)}"
 
-    def _build_context(self, search_results: list[dict], max_chars: int = 300) -> str:
-        """Build context string from search results"""
+    def _build_context(self, search_results: list[dict], max_chars: int = None) -> str:
+        """Build context string from search results WITHOUT truncation (full context for better RAG)"""
         if not search_results:
             return ""
 
@@ -85,18 +85,23 @@ Please provide a clear, concise answer that directly references the code snippet
         for i, result in enumerate(search_results[:5], 1):  # Max 5 chunks
             metadata = result.get('metadata', {})
             text = result.get('text', '')
+            class_name = result.get('class_name', '')
+            similarity = result.get('similarity', 0)
 
-            # Truncate text if too long
-            if len(text) > max_chars:
-                text = text[:max_chars] + "..."
-
+            # NO TRUNCATION - Use full context for better RAG quality
             file_path = metadata.get('file_path', 'unknown')
             name = metadata.get('name', 'unknown')
             start_line = metadata.get('start_line', '?')
             end_line = metadata.get('end_line', '?')
 
-            part = f"""[{i}] File: {file_path} (lines {start_line}-{end_line})
-Function/Class: {name}
+            # Enhanced context with class information
+            if class_name:
+                full_name = f"{class_name}.{name}"
+            else:
+                full_name = name
+
+            part = f"""[{i}] {full_name} (similarity: {similarity:.1%})
+File: {file_path} (lines {start_line}-{end_line})
 Code:
 ```python
 {text}

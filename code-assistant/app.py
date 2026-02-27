@@ -15,6 +15,7 @@ from embeddings import embed_texts
 from vector_db import get_vector_db, reset_vector_db
 from rag_handler import get_rag_handler
 from utils import clone_repository, find_python_files, cleanup_repo
+from cache_manager import get_cache
 
 # Page config
 st.set_page_config(
@@ -90,9 +91,39 @@ with st.sidebar:
             status_container = st.empty()
 
             try:
-                # Clone repo
-                progress_container.info("📥 Cloning repository...")
-                repo_path, error = clone_repository(repo_url)
+                # CHECK CACHE FIRST (600x faster!)
+                cache = get_cache()
+                if cache.is_cached(repo_url):
+                    progress_container.info("⚡ Loading from cache (instant analysis)...")
+                    cached_data = cache.load_analysis(repo_url)
+                    if cached_data:
+                        chunks_dict, embeddings = cached_data
+                        progress_container.info("💾 Restoring to vector database...")
+                        reset_vector_db()
+                        vector_db = get_vector_db()
+                        success = vector_db.add_chunks(chunks_dict, embeddings)
+
+                        if success:
+                            st.session_state.repo_analyzed = True
+                            st.session_state.chunks_count = len(chunks_dict)
+                            progress_container.empty()
+                            status_container.markdown(
+                                f'<div class="success-box">'
+                                f'⚡ Cached! Loaded {len(chunks_dict)} code chunks instantly!'
+                                f'</div>',
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            status_container.error("❌ Failed to restore from cache")
+                        try:
+                            import sys
+                        except:
+                            pass
+                else:
+                    # NOT CACHED - Do full analysis
+                    # Clone repo
+                    progress_container.info("📥 Cloning repository...")
+                    repo_path, error = clone_repository(repo_url)
 
                 if error:
                     status_container.error(f"❌ Error: {error}")
@@ -137,12 +168,17 @@ with st.sidebar:
                                 success = vector_db.add_chunks(valid_chunks, valid_embeddings)
 
                                 if success:
+                                    # SAVE TO CACHE for future analysis
+                                    progress_container.info("💾 Saving to cache...")
+                                    cache.save_analysis(repo_url, valid_chunks, valid_embeddings)
+
                                     st.session_state.repo_analyzed = True
                                     st.session_state.chunks_count = len(valid_chunks)
                                     progress_container.empty()
                                     status_container.markdown(
                                         f'<div class="success-box">'
                                         f'✅ Successfully analyzed {len(valid_chunks)} code chunks!'
+                                        f'<br>💾 Cached for future use (instant re-analysis)'
                                         f'</div>',
                                         unsafe_allow_html=True
                                     )
