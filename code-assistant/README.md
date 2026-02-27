@@ -1,6 +1,6 @@
 ---
 title: Code Documentation Assistant
-emoji: 🔍
+emoji: magnifying_glass
 colorFrom: blue
 colorTo: purple
 sdk: docker
