@@ -82,7 +82,7 @@ Please provide a clear, concise answer that directly references the code snippet
             return ""
 
         context_parts = []
-        for i, result in enumerate(search_results[:5], 1):  # Max 5 chunks
+        for i, result in enumerate(search_results[:20], 1):  # Max 20 chunks for richer context
             metadata = result.get('metadata', {})
             text = result.get('text', '')
             class_name = result.get('class_name', '')

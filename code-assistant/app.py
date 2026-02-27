@@ -214,7 +214,7 @@ if st.session_state.repo_analyzed:
             else:
                 # Search vector DB
                 vector_db = get_vector_db()
-                results = vector_db.search(question_embedding, top_k=5)
+                results = vector_db.search(question_embedding, top_k=20)
 
                 if not results:
                     st.info("ℹ️ No relevant code found for your question")
