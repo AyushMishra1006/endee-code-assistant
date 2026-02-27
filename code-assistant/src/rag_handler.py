@@ -60,27 +60,30 @@ class RAGHandler:
         if not context:
             return "No relevant code found for your question."
 
-        # Create balanced prompt - concise with smart insights
-        prompt = f"""You are a Python code analyst. Answer the question concisely but intelligently.
+        # Create balanced prompt - informative but concise
+        prompt = f"""You are a Python code analyst. Answer the question clearly and informatively.
 
 CODE CONTEXT:
 {context}
 
 QUESTION: {question}
 
-GUIDELINES:
-1. Answer directly (2-3 sentences max)
-2. Explain how it works with brief code references
-3. Add 1 key insight or consideration if relevant
-4. NEVER invent functionality not in provided code
-5. Keep it conversational, not verbose
+ANSWER GUIDELINES:
+1. Direct answer: What does the code do? (2-3 sentences)
+2. How it works: Explain the implementation with code references (2-3 sentences)
+3. Key insights: 2-3 brief points about how/why it matters
+4. NEVER invent functionality not shown in provided code
+5. Keep it professional but conversational
 
 Format:
-[Direct answer about what the code does]
+**Answer:** [What the code does]
 
-[Brief explanation of how/why it works - reference code files/methods]
+**How it works:** [Implementation explanation with file/method references]
 
-[Optional: 1 key insight or gotcha if relevant]"""
+**Key insights:**
+- [Point 1]
+- [Point 2]
+- [Point 3 - if relevant]"""
 
         try:
             response = self.model.generate_content(prompt)
