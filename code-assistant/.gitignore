@@ -60,4 +60,8 @@ Thumbs.db
 /tmp/
 /.clang-format
 /endee-code-assistant/
-# Final cleanup
+
+# Runtime directories (generated at runtime)
+.endee_vectors/
+.claude_cache/
+logs/
