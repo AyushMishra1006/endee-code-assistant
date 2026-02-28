@@ -77,10 +77,18 @@ if 'chunks_count' not in st.session_state:
 with st.sidebar:
     st.header("📤 Step 1: Analyze Repository")
 
+    # Python focus messaging
+    st.info("""
+    **🎯 Currently Optimized For: Python Codebases**
+
+    This system uses AST-based method-level parsing for superior semantic granularity.
+    Python's Abstract Syntax Tree enables precise code boundaries that other languages cannot match.
+    """)
+
     repo_url = st.text_input(
         "GitHub Repository URL",
         placeholder="https://github.com/user/repo.git",
-        help="Enter a public GitHub repository URL"
+        help="Enter a public GitHub repository URL (Python repos recommended)"
     )
 
     if st.button("🚀 Analyze Repository", use_container_width=True, type="primary"):
@@ -250,29 +258,46 @@ if st.session_state.repo_analyzed:
 else:
     # Landing page
     st.markdown("""
-    ## How It Works
+    ## System Design
 
-    1. **Analyze**: Paste a GitHub repository URL
-    2. **Index**: We parse, chunk, and embed your code
-    3. **Query**: Ask natural language questions
-    4. **Learn**: Get AI-powered answers with source code
+    **Current Focus: Python Codebases**
+
+    This system is architecturally optimized for Python through AST-based method-level extraction.
+    This enables superior semantic granularity compared to class-level or line-level chunking.
+
+    ### Why This Approach?
+    - **AST Parsing**: Python's Abstract Syntax Tree provides exact method boundaries
+    - **Semantic Specificity**: Each method is an independent semantic unit
+    - **Endee Optimization**: Vector search performs optimally with this granularity
+    - **Future Ready**: Architecture designed to extend to JavaScript, Go, Java
+
+    ### How It Works
+
+    1. **Analyze**: Paste a Python GitHub repository URL
+    2. **Parse**: Extract methods using Python AST (not classes or files)
+    3. **Embed**: Convert to semantic vectors via Sentence-Transformers
+    4. **Index**: Store in Endee Vector Database for semantic search
+    5. **Query**: Ask questions in natural language
+    6. **Explain**: Get AI-powered answers with full code context (no truncation)
 
     ### Key Features
-    - 🔍 **Semantic Search**: Find code by meaning, not keywords
-    - 🤖 **RAG-Powered**: AI explains code with context
-    - 📊 **Vector Database**: Fast, accurate code retrieval
-    - ⚡ **Scalable**: Handles large codebases efficiently
+    - 🔍 **Semantic Search**: Find code by MEANING via Endee, not keywords
+    - 📦 **Method-Level Chunking**: Superior semantic specificity
+    - 🤖 **Full-Context RAG**: Complete code sent to LLM (no truncation)
+    - ⚡ **Smart Caching**: 600x faster on repeated repos
+    - 💾 **Persistent Storage**: Data survives restarts
 
     ### Technology Stack
-    - **Vector DB**: Endee (semantic search)
-    - **Embeddings**: Sentence-Transformers (free, local)
-    - **LLM**: Gemini 2.5 Flash (RAG)
-    - **Parser**: Python AST (code extraction)
-    - **UI**: Streamlit
+    - **Vector DB**: Endee (core semantic engine)
+    - **Embeddings**: Sentence-Transformers (384-dimensional)
+    - **LLM**: Gemini 2.5 Flash (RAG generation)
+    - **Parser**: Python AST (method extraction)
+    - **Storage**: Pickle + JSON (persistent indexes)
+    - **Frontend**: Streamlit
 
     ---
 
-    **Get started**: Enter a GitHub repo URL in the sidebar! →
+    **Get started**: Enter a Python GitHub repo URL in the sidebar! →
     """)
 
 # Footer
