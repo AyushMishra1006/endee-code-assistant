@@ -3,7 +3,7 @@
 
 **🚀 [Live Demo - Click Here](https://endeecodeassistant.streamlit.app/)** ← Try it now!
 
-**Author**: Ayush Mishra | **Built for**: Endee.io Internship | **Status**: ✅ Production Ready
+**Author**: Ayush Mishra | **Built for**: Endee.io Internship 
 
 ---
 
