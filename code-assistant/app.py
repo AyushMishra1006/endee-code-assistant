@@ -101,34 +101,47 @@ with st.sidebar:
             try:
                 # CHECK CACHE FIRST (600x faster!)
                 cache = get_cache()
-                if cache.is_cache_valid(repo_url):  # FIXED: Check validity, not just existence
-                    progress_container.info("⚡ Loading from cache (instant analysis)...")
-                    cached_data = cache.load_analysis(repo_url)
-                    if cached_data:
-                        chunks_dict, embeddings = cached_data
-                        progress_container.info("💾 Restoring to vector database...")
-                        reset_vector_db()
-                        vector_db = get_vector_db()
-                        success = vector_db.add_chunks(chunks_dict, embeddings)
 
-                        if success:
-                            st.session_state.repo_analyzed = True
-                            st.session_state.chunks_count = len(chunks_dict)
-                            progress_container.empty()
-                            status_container.markdown(
-                                f'<div class="success-box">'
-                                f'⚡ Cached! Loaded {len(chunks_dict)} code chunks instantly!'
-                                f'</div>',
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            status_container.error("❌ Failed to restore from cache")
-                        try:
-                            import sys
-                        except:
-                            pass
-                else:
-                    # NOT CACHED - Do full analysis
+                # Show cache checking status
+                progress_container.info("🔍 Checking for cached analysis...")
+
+                # Flag to track if we need to re-analyze
+                cache_valid = False
+
+                # Check if cache exists
+                if cache.is_cached(repo_url):
+                    progress_container.info("📋 Found cache file. Validating freshness...")
+
+                    # Check if cache is valid (TTL + commit hash)
+                    if cache.is_cache_valid(repo_url):  # FIXED: Check validity, not just existence
+                        cache_valid = True
+                        progress_container.info("✅ Cache is fresh! Loading from cache (instant analysis)...")
+                        cached_data = cache.load_analysis(repo_url)
+                        if cached_data:
+                            chunks_dict, embeddings = cached_data
+                            progress_container.info("💾 Restoring to vector database...")
+                            reset_vector_db()
+                            vector_db = get_vector_db()
+                            success = vector_db.add_chunks(chunks_dict, embeddings)
+
+                            if success:
+                                st.session_state.repo_analyzed = True
+                                st.session_state.chunks_count = len(chunks_dict)
+                                progress_container.empty()
+                                status_container.markdown(
+                                    f'<div class="success-box">'
+                                    f'✅ Cache is Fresh! Loaded {len(chunks_dict)} code chunks instantly!'
+                                    f'</div>',
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                status_container.error("❌ Failed to restore from cache")
+                    else:
+                        # Cache exists but is invalid (expired or changed)
+                        progress_container.warning("⚠️ Cache is stale! Repository changed or TTL expired. Re-analyzing...")
+
+                # If cache not valid, do full analysis
+                if not cache_valid:
                     # Clone repo
                     progress_container.info("📥 Cloning repository...")
                     repo_path, error = clone_repository(repo_url)
