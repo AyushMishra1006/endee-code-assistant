@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Optional, List
 from datetime import datetime, timedelta
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
 
 class RepositoryCache:
     """Manage cached analysis of repositories"""
@@ -36,6 +41,27 @@ class RepositoryCache:
             return commit_hash
         except Exception:
             # Not a git repo or git not available
+            return None
+
+    def get_github_repo_commit(self, repo_url: str) -> Optional[str]:
+        """Get the ANALYZED GitHub repo's commit hash (not Endee's commit)"""
+        if not requests:
+            return None
+
+        try:
+            # Extract owner/repo from URL
+            # https://github.com/owner/repo → owner/repo
+            path = repo_url.replace("https://github.com/", "").rstrip("/")
+
+            # Query GitHub API for latest commit
+            api_url = f"https://api.github.com/repos/{path}/commits/HEAD"
+            response = requests.get(api_url, timeout=5)
+
+            if response.status_code == 200:
+                return response.json()['sha']  # Return commit hash
+            return None
+        except Exception:
+            # Network error, API error, etc.
             return None
 
     def is_cached(self, repo_url: str) -> bool:
@@ -71,9 +97,9 @@ class RepositoryCache:
             if age > timedelta(hours=ttl_hours):
                 return False  # Cache expired
 
-            # Check if Git commit has changed
+            # Check if ANALYZED REPO's Git commit has changed (FIXED)
             cached_commit = cache_data.get("commit_hash")
-            current_commit = self.get_current_commit_hash()
+            current_commit = self.get_github_repo_commit(repo_url)
             if cached_commit and current_commit and cached_commit != current_commit:
                 return False  # Repository changed
 
@@ -90,7 +116,7 @@ class RepositoryCache:
             cache_data = {
                 "repo_url": repo_url,
                 "timestamp": datetime.now().isoformat(),
-                "commit_hash": self.get_current_commit_hash(),  # NEW: Git version
+                "commit_hash": self.get_github_repo_commit(repo_url),  # FIXED: Get ANALYZED repo's commit
                 "chunks_count": len(chunks),
                 "chunks": chunks,
                 "embeddings": embeddings,

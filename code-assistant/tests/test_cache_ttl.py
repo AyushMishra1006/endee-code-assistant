@@ -46,12 +46,12 @@ class TestCacheTTL:
         assert loaded_embeddings == embeddings
 
     def test_cache_stores_commit_hash(self, cache, temp_cache_dir):
-        """Test that cache stores commit hash"""
+        """Test that cache stores commit hash of ANALYZED repo"""
         repo_url = "https://github.com/test/repo"
         chunks = [{"id": 1}]
         embeddings = [[0.1]]
 
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             cache.save_analysis(repo_url, chunks, embeddings)
 
         # Verify commit hash in file
@@ -67,11 +67,11 @@ class TestCacheTTL:
         chunks = [{"id": 1}]
         embeddings = [[0.1]]
 
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             cache.save_analysis(repo_url, chunks, embeddings)
 
         # Cache should be valid immediately
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             assert cache.is_cache_valid(repo_url, ttl_hours=24) is True
 
         # Mock time to expire cache (simulate 25 hours passing)
@@ -82,29 +82,29 @@ class TestCacheTTL:
             mock_datetime.fromisoformat = datetime.fromisoformat
 
             # Save with old timestamp
-            with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+            with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
                 cache.save_analysis(repo_url, chunks, embeddings)
 
         # Cache should now be invalid (expired)
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             assert cache.is_cache_valid(repo_url, ttl_hours=24) is False
 
     def test_cache_invalid_on_commit_change(self, cache):
-        """Test that cache is invalid when repo commit changes"""
+        """Test that cache is invalid when ANALYZED repo's commit changes"""
         repo_url = "https://github.com/test/repo"
         chunks = [{"id": 1}]
         embeddings = [[0.1]]
 
         # Save with commit abc123
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             cache.save_analysis(repo_url, chunks, embeddings)
 
         # Cache valid with same commit
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             assert cache.is_cache_valid(repo_url) is True
 
         # Cache invalid with different commit (repo changed)
-        with patch.object(cache, 'get_current_commit_hash', return_value='xyz789'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='xyz789'):
             assert cache.is_cache_valid(repo_url) is False
 
     def test_nonexistent_cache_returns_none(self, cache):
@@ -117,19 +117,19 @@ class TestCacheTTL:
         is_valid = cache.is_cache_valid("https://github.com/nonexistent/repo")
         assert is_valid is False
 
-    def test_cache_without_git_still_works(self, cache):
-        """Test cache works when git is not available"""
+    def test_cache_without_github_api_still_works(self, cache):
+        """Test cache works when GitHub API is not available"""
         repo_url = "https://github.com/test/repo"
         chunks = [{"id": 1}]
         embeddings = [[0.1]]
 
-        # Simulate git not being available
-        with patch.object(cache, 'get_current_commit_hash', return_value=None):
+        # Simulate GitHub API not being available
+        with patch.object(cache, 'get_github_repo_commit', return_value=None):
             result = cache.save_analysis(repo_url, chunks, embeddings)
             assert result is True
 
         # Should still be able to load (TTL check passes, commit check skipped)
-        with patch.object(cache, 'get_current_commit_hash', return_value=None):
+        with patch.object(cache, 'get_github_repo_commit', return_value=None):
             loaded = cache.load_analysis(repo_url)
             assert loaded is not None
 
@@ -172,11 +172,11 @@ class TestCacheIntegration:
         chunks = [{"id": 1}]
         embeddings = [[0.1]]
 
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             cache.save_analysis(repo_url, chunks, embeddings)
 
         # Should use 24 hour default
-        with patch.object(cache, 'get_current_commit_hash', return_value='abc123'):
+        with patch.object(cache, 'get_github_repo_commit', return_value='abc123'):
             assert cache.is_cache_valid(repo_url) is True
 
 
