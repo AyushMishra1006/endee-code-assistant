@@ -46,22 +46,31 @@ class RepositoryCache:
     def get_github_repo_commit(self, repo_url: str) -> Optional[str]:
         """Get the ANALYZED GitHub repo's commit hash (not Endee's commit)"""
         if not requests:
+            print(f"DEBUG: requests library not available")
             return None
 
         try:
             # Extract owner/repo from URL
             # https://github.com/owner/repo → owner/repo
             path = repo_url.replace("https://github.com/", "").rstrip("/")
+            print(f"DEBUG: Extracted path: {path}")
 
             # Query GitHub API for latest commit
             api_url = f"https://api.github.com/repos/{path}/commits/HEAD"
+            print(f"DEBUG: API URL: {api_url}")
             response = requests.get(api_url, timeout=5)
+            print(f"DEBUG: API Response Status: {response.status_code}")
 
             if response.status_code == 200:
-                return response.json()['sha']  # Return commit hash
+                commit = response.json()['sha']
+                print(f"DEBUG: Got commit hash: {commit[:8]}...")
+                return commit
+            else:
+                print(f"DEBUG: API returned status {response.status_code}")
             return None
-        except Exception:
+        except Exception as e:
             # Network error, API error, etc.
+            print(f"DEBUG: Exception getting commit: {e}")
             return None
 
     def is_cached(self, repo_url: str) -> bool:
@@ -100,9 +109,17 @@ class RepositoryCache:
             # Check if ANALYZED REPO's Git commit has changed (FIXED)
             cached_commit = cache_data.get("commit_hash")
             current_commit = self.get_github_repo_commit(repo_url)
+            print(f"DEBUG: Cached commit: {cached_commit[:8] if cached_commit else 'None'}...")
+            print(f"DEBUG: Current commit: {current_commit[:8] if current_commit else 'None'}...")
+
             if cached_commit and current_commit and cached_commit != current_commit:
+                print(f"DEBUG: Commits differ! Cache INVALID")
                 return False  # Repository changed
 
+            if not current_commit and cached_commit:
+                print(f"DEBUG: API failed to get current commit, assuming cache is VALID (fallback)")
+
+            print(f"DEBUG: Cache is VALID")
             return True
         except Exception:
             return False
