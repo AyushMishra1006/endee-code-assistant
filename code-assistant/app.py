@@ -101,7 +101,7 @@ with st.sidebar:
             try:
                 # CHECK CACHE FIRST (600x faster!)
                 cache = get_cache()
-                if cache.is_cached(repo_url):
+                if cache.is_cache_valid(repo_url):  # FIXED: Check validity, not just existence
                     progress_container.info("⚡ Loading from cache (instant analysis)...")
                     cached_data = cache.load_analysis(repo_url)
                     if cached_data:
