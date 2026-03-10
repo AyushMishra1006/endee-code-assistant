@@ -72,7 +72,7 @@ class VectorDatabase:
             True if successful, False otherwise
         """
         if not self.initialized:
-            print("[ERROR] Endee not initialized")
+            print("[ERROR] Endee not initialized. Check if server is running: docker-compose up -d")
             return False
 
         if len(chunks) != len(embeddings):
@@ -80,12 +80,46 @@ class VectorDatabase:
             return False
 
         try:
+            import numpy as np
+
+            # VALIDATE EMBEDDINGS (critical debugging step)
+            print(f"[DEBUG] Validating {len(embeddings)} embeddings...")
+            nan_count = 0
+            invalid_dim = 0
+
+            for i, emb in enumerate(embeddings):
+                # Check for NaN values
+                if isinstance(emb, (list, np.ndarray)):
+                    emb_array = np.array(emb)
+                    if np.isnan(emb_array).any():
+                        nan_count += 1
+                    # Check dimension
+                    if len(emb) != 384:
+                        invalid_dim += 1
+                        print(f"[WARNING] Embedding {i} has dimension {len(emb)}, expected 384")
+
+            if nan_count > 0:
+                print(f"[ERROR] Found {nan_count}/{len(embeddings)} embeddings with NaN values!")
+                print("[DEBUG] This usually means sentence-transformers failed to encode text.")
+                return False
+
+            if invalid_dim > 0:
+                print(f"[ERROR] Found {invalid_dim} embeddings with wrong dimension (not 384)")
+                return False
+
+            print(f"[OK] All embeddings valid (384-dim, no NaN)")
+
             self.initialize()  # Ensure index exists
             index = self.client.get_index(self.index_name)
 
             # Prepare vectors for Endee
             vectors_to_upsert = []
-            for chunk, embedding in zip(chunks, embeddings):
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                # Validate chunk has required fields
+                if not chunk.get('id') or not chunk.get('file_path') or not chunk.get('name'):
+                    print(f"[WARNING] Chunk {i} missing required fields. Skipping.")
+                    continue
+
                 vectors_to_upsert.append({
                     "id": chunk['id'],
                     "vector": embedding,
@@ -101,13 +135,23 @@ class VectorDatabase:
                     }
                 })
 
+            if not vectors_to_upsert:
+                print("[ERROR] No valid vectors to upsert after validation!")
+                return False
+
             # Upsert to Endee (insert or update)
             index.upsert(vectors_to_upsert)
-            print(f"[OK] Indexed {len(chunks)} chunks in Endee (total in index: {len(vectors_to_upsert)})")
+            print(f"[OK] Indexed {len(vectors_to_upsert)} chunks in Endee")
             return True
 
         except Exception as e:
             print(f"[ERROR] Failed to add chunks to Endee: {e}")
+            print("[DEBUG] Common causes:")
+            print("  1. Endee server not running → docker-compose up -d")
+            print("  2. Embeddings contain NaN → check sentence-transformers output")
+            print("  3. Chunks missing metadata → check code_parser.py")
+            import traceback
+            traceback.print_exc()
             return False
 
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict]:

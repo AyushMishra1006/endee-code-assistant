@@ -204,7 +204,14 @@ with st.sidebar:
                                             unsafe_allow_html=True
                                         )
                                     else:
-                                        status_container.error("❌ Failed to index chunks")
+                                        status_container.error(
+                                            "❌ Failed to index chunks\n\n"
+                                            "**Troubleshooting:**\n"
+                                            "1. Is Endee running? → `docker-compose up -d`\n"
+                                            "2. Check console logs for error details\n"
+                                            "3. Embeddings might contain NaN values\n"
+                                            "4. Check that Docker is available"
+                                        )
 
                                 cleanup_repo(repo_path)
 

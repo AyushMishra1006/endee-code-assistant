@@ -43,10 +43,22 @@ class EmbeddingsGenerator:
             return [0.1] * 384
 
         try:
+            if not text or not text.strip():
+                print("[WARNING] Empty text passed to embed_text, returning zeros")
+                return [0.0] * 384
+
             embedding = self.model.encode(text, convert_to_tensor=False)
-            return embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+            result = embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+
+            # Check for NaN values
+            if any(isinstance(v, float) and np.isnan(v) for v in result):
+                print(f"[ERROR] Embedding contains NaN values for text: {text[:50]}...")
+                return None
+
+            return result
         except Exception as e:
-            print(f"Warning: Could not embed text: {e}")
+            print(f"[ERROR] Could not embed text: {e}")
+            print(f"[DEBUG] Text sample: {text[:100]}...")
             return None
 
     def embed_texts(self, texts: list[str]) -> list[Optional[list[float]]]:
