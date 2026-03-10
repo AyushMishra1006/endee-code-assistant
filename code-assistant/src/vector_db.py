@@ -1,194 +1,191 @@
 """
-Vector Database Wrapper - Production-grade integration with Endee
-Includes persistence, HNSW optimization, and efficient indexing
+Vector Database Wrapper - Using Endee Vector Database
+Provides persistent, high-performance vector storage and semantic search
 """
 from typing import Optional, List
-import json
-import math
-import pickle
-from pathlib import Path
+import time
 
 
 class VectorDatabase:
-    """Production-grade Vector Database with Endee-compatible interface"""
+    """Endee-based Vector Database with production-grade interface"""
 
-    def __init__(self, persist_dir: str = ".endee_vectors"):
-        """Initialize vector database with persistence"""
-        self.persist_dir = Path(persist_dir)
-        self.persist_dir.mkdir(exist_ok=True)
+    def __init__(self, endee_url: str = "http://localhost:8080"):
+        """
+        Initialize connection to Endee vector database
 
-        # In-memory index for fast search
-        self.db = {}  # chunk_id -> {embedding, metadata, text}
-        self.chunk_ids = []  # For tracking chunks
+        Args:
+            endee_url: URL where Endee server is running
+        """
+        self.endee_url = endee_url
+        self.index_name = "code_chunks"
+        self.client = None
+        self.index = None
         self.initialized = False
 
-        # Load from disk if exists (persistence)
-        self._load_from_disk()
+        self._connect_to_endee()
+
+    def _connect_to_endee(self):
+        """Connect to Endee server"""
+        try:
+            from endee import Endee
+            self.client = Endee()  # Default connects to localhost:8080
+            self.initialized = True
+            print("[OK] Connected to Endee vector database")
+        except ImportError:
+            print("[ERROR] Endee SDK not installed. Run: pip install endee")
+            raise
+        except Exception as e:
+            print(f"[ERROR] Failed to connect to Endee: {e}")
+            print("[INFO] Make sure Endee server is running: docker-compose up -d")
+            raise
 
     def initialize(self):
-        """Initialize Endee vector database"""
-        self.initialized = True
-        print("[OK] Vector database initialized (persistent mode with HNSW optimization)")
+        """Initialize Endee index for code chunks"""
+        if not self.initialized:
+            raise RuntimeError("Not connected to Endee. Check if server is running.")
 
-    def _load_from_disk(self) -> bool:
-        """Load vector database from persistent storage"""
         try:
-            db_file = self.persist_dir / "vectors.pkl"
-            metadata_file = self.persist_dir / "metadata.json"
-
-            if db_file.exists() and metadata_file.exists():
-                with open(db_file, "rb") as f:
-                    self.db = pickle.load(f)
-
-                with open(metadata_file, "r") as f:
-                    metadata = json.load(f)
-                    self.chunk_ids = metadata.get("chunk_ids", [])
-
-                print(f"[OK] Loaded {len(self.db)} chunks from persistent storage")
-                return True
+            # Create or get the index
+            self.client.create_index(
+                name=self.index_name,
+                dimension=384,  # Sentence-Transformers output dimension
+                space_type="cosine",  # Cosine similarity for semantic search
+                precision="float32"  # Full precision for best accuracy
+            )
+            print("[OK] Endee index initialized (384-dim, cosine space, INT8 precision)")
         except Exception as e:
-            print(f"Note: Starting fresh vector database: {e}")
-
-        return False
-
-    def _save_to_disk(self) -> bool:
-        """Save vector database to persistent storage"""
-        try:
-            db_file = self.persist_dir / "vectors.pkl"
-            metadata_file = self.persist_dir / "metadata.json"
-
-            # Save embeddings and data
-            with open(db_file, "wb") as f:
-                pickle.dump(self.db, f)
-
-            # Save metadata
-            metadata = {
-                "chunk_ids": self.chunk_ids,
-                "total_chunks": len(self.db)
-            }
-            with open(metadata_file, "w") as f:
-                json.dump(metadata, f)
-
-            return True
-        except Exception as e:
-            print(f"Warning: Could not save to disk: {e}")
-            return False
+            # Index might already exist, which is fine
+            if "already exists" in str(e):
+                print("[OK] Endee index already exists")
+            else:
+                raise
 
     def add_chunks(self, chunks: list[dict], embeddings: list[list[float]]) -> bool:
         """
-        Add code chunks with embeddings to vector database with persistence.
-
-        Stores in:
-        1. In-memory index (self.db) for fast search
-        2. Disk storage (persistent) for durability
-        3. Optimized for O(log n) approximate nearest neighbor search
+        Add code chunks with embeddings to Endee database
 
         Args:
-            chunks: List of chunk dictionaries (with metadata)
+            chunks: List of chunk dictionaries with metadata
             embeddings: List of embedding vectors (384-dimensional)
 
         Returns:
             True if successful, False otherwise
         """
         if not self.initialized:
-            self.initialize()
+            print("[ERROR] Endee not initialized")
+            return False
+
+        if len(chunks) != len(embeddings):
+            print(f"[ERROR] Chunk count ({len(chunks)}) != embedding count ({len(embeddings)})")
+            return False
 
         try:
-            if len(chunks) != len(embeddings):
-                return False
+            self.initialize()  # Ensure index exists
+            index = self.client.get_index(self.index_name)
 
-            # Store in-memory index
+            # Prepare vectors for Endee
+            vectors_to_upsert = []
             for chunk, embedding in zip(chunks, embeddings):
-                chunk_id = chunk['id']
-                self.db[chunk_id] = {
-                    'embedding': embedding,
-                    'metadata': chunk,
-                    'text': chunk.get('source_code', ''),
-                    'class_name': chunk.get('class_name', '')
-                }
-                if chunk_id not in self.chunk_ids:
-                    self.chunk_ids.append(chunk_id)
+                vectors_to_upsert.append({
+                    "id": chunk['id'],
+                    "vector": embedding,
+                    "meta": {
+                        "file_path": chunk['file_path'],
+                        "name": chunk['name'],
+                        "class_name": chunk.get('class_name', ''),
+                        "type": chunk.get('type', 'function'),
+                        "start_line": chunk.get('start_line', 0),
+                        "end_line": chunk.get('end_line', 0),
+                        "docstring": chunk.get('docstring', ''),
+                        "source_code": chunk.get('source_code', '')
+                    }
+                })
 
-            # Persist to disk
-            success = self._save_to_disk()
-
-            print(f"[OK] Indexed {len(chunks)} chunks (total: {len(self.db)})")
-            return success
+            # Upsert to Endee (insert or update)
+            index.upsert(vectors_to_upsert)
+            print(f"[OK] Indexed {len(chunks)} chunks in Endee (total in index: {len(vectors_to_upsert)})")
+            return True
 
         except Exception as e:
-            print(f"Error adding chunks: {e}")
+            print(f"[ERROR] Failed to add chunks to Endee: {e}")
             return False
 
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict]:
         """
-        Search for similar code chunks using semantic similarity with HNSW optimization.
+        Search for similar code chunks using Endee
 
         Args:
-            query_embedding: Query embedding vector
+            query_embedding: Query vector (384-dimensional)
             top_k: Number of top results to return
 
         Returns:
-            List of top-k similar chunks with metadata
+            List of similar chunks with metadata and similarity scores
         """
-        if not self.db:
+        if not self.initialized:
+            print("[ERROR] Endee not initialized")
+            return []
+
+        if not query_embedding or len(query_embedding) != 384:
+            print("[ERROR] Query embedding must be 384-dimensional")
             return []
 
         try:
-            # Calculate cosine similarity for all chunks
-            results = []
-            for chunk_id, data in self.db.items():
-                similarity = self._cosine_similarity(
-                    query_embedding,
-                    data['embedding']
-                )
-                results.append({
-                    'id': chunk_id,
-                    'similarity': similarity,
-                    'metadata': data['metadata'],
-                    'text': data['text'],
-                    'class_name': data.get('class_name', '')
+            index = self.client.get_index(self.index_name)
+
+            # Search in Endee (returns results ordered by similarity)
+            results = index.query(
+                vector=query_embedding,
+                top_k=top_k
+            )
+
+            # Format results to match expected interface
+            formatted_results = []
+            for result in results:
+                formatted_results.append({
+                    'id': result['id'],
+                    'similarity': result['similarity'],  # Cosine similarity score (0-1)
+                    'metadata': result['meta'],
+                    'text': result['meta'].get('source_code', ''),
+                    'class_name': result['meta'].get('class_name', '')
                 })
 
-            # Sort by similarity and return top-k
-            results.sort(key=lambda x: x['similarity'], reverse=True)
-            return results[:top_k]
+            return formatted_results
 
         except Exception as e:
-            print(f"Error during search: {e}")
+            print(f"[ERROR] Search failed: {e}")
             return []
 
-    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """Calculate cosine similarity between two vectors"""
-        try:
-            dot_product = sum(a * b for a, b in zip(vec1, vec2))
-            mag1 = math.sqrt(sum(a * a for a in vec1))
-            mag2 = math.sqrt(sum(b * b for b in vec2))
-
-            if mag1 == 0 or mag2 == 0:
-                return 0.0
-
-            return dot_product / (mag1 * mag2)
-        except Exception:
-            return 0.0
-
     def clear(self):
-        """Clear all data from database"""
-        self.db = {}
-        self.chunk_ids = []
-        self._save_to_disk()
+        """Clear all vectors from the index"""
+        try:
+            if self.initialized:
+                self.client.delete_index(self.index_name)
+                print("[OK] Cleared Endee index")
+                self.initialize()  # Recreate empty index
+        except Exception as e:
+            print(f"[WARNING] Failed to clear index: {e}")
 
     def get_stats(self) -> dict:
         """Get database statistics"""
         try:
-            db_file = self.persist_dir / "vectors.pkl"
-            size_mb = db_file.stat().st_size / (1024 * 1024) if db_file.exists() else 0
-        except:
-            size_mb = 0
+            if self.initialized:
+                index = self.client.get_index(self.index_name)
+                # Endee SDK doesn't expose vector count directly
+                # Return basic info about the index
+                return {
+                    "index_name": self.index_name,
+                    "database": "Endee",
+                    "dimension": 384,
+                    "space_type": "cosine",
+                    "status": "connected"
+                }
+        except Exception as e:
+            print(f"[WARNING] Could not get stats: {e}")
 
         return {
-            "total_chunks": len(self.db),
-            "persist_dir": str(self.persist_dir),
-            "size_mb": round(size_mb, 2)
+            "index_name": self.index_name,
+            "database": "Endee",
+            "status": "error"
         }
 
 
