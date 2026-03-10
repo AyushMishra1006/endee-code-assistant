@@ -193,25 +193,38 @@ RESULT:
 ### **Endee Vector Database Integration**
 
 ```python
-# How Endee powers this system:
+# How Endee powers this system (v2 - Production-Grade):
 
-1. STORAGE LAYER (Endee interface)
-   ├─ Input: code chunks + embeddings (384-dim)
-   ├─ Storage: Persistent disk (pickle + JSON)
-   └─ Interface: Dict-based in-memory access
+from endee import Endee
 
-2. SEARCH LAYER (Endee semantic search)
+1. INITIALIZATION LAYER
+   ├─ Connect to Endee server (Docker-based)
+   ├─ Create index: 384-dimensional, cosine space
+   ├─ Precision: float32 (full accuracy)
+   └─ Persistence: Docker volume (endee-data)
+
+2. STORAGE LAYER (Endee SDK)
+   ├─ Input: code chunks + embeddings (384-dim vectors)
+   ├─ Storage: Endee persistent database
+   ├─ Metadata: file_path, name, class_name, source_code, docstring
+   ├─ Method: index.upsert() - Insert or update vectors
+   └─ Durability: ACID-compliant, survives restarts
+
+3. SEARCH LAYER (Endee HNSW optimization)
    ├─ Input: Query embedding (384-dim)
-   ├─ Algorithm: Cosine similarity calculation
-   │   similarity = dot_product(query, chunk) / (||query|| * ||chunk||)
-   ├─ Ranking: All chunks scored and sorted
-   └─ Output: Top-k results by similarity
+   ├─ Algorithm: HNSW (Hierarchical Navigable Small World)
+   │   - O(log n) search complexity
+   │   - Optimized for high-dimensional vectors
+   │   - Cosine similarity scoring
+   ├─ Ranking: Endee returns results pre-sorted by relevance
+   └─ Output: Top-k results with similarity scores
 
-3. RETRIEVAL OPTIMIZATION
+4. RETRIEVAL OPTIMIZATION
    ├─ Chunk count: ~9 methods per class
    ├─ Top-k: 20 (balanced quality vs quantity)
-   ├─ Similarity threshold: None (confidence filtering)
-   └─ Result quality: Semantically ranked by Endee
+   ├─ Dimension: 384 (Sentence-Transformers all-MiniLM-L6-v2)
+   ├─ Space type: Cosine similarity (semantic meaning)
+   └─ Result quality: Production-grade vector search
 ```
 
 ### **Caching Strategy: 600x Performance Gain**
@@ -313,16 +326,78 @@ Endee Search Complexity:
 
 ---
 
+## 🚀 Endee Deployment & Integration
+
+### **Why Docker for Endee?**
+
+```
+Production Deployment Benefits:
+├─ Containerized: Isolated from system dependencies
+├─ Persistent Storage: Docker volume (endee-data) survives restarts
+├─ Easy Scaling: Can run multiple instances
+├─ Same Environment: Dev → Staging → Production consistency
+└─ Health Checks: Automated monitoring + auto-recovery
+
+Docker Compose Configuration (docker-compose.yml):
+├─ image: endeeio/endee-server:latest (pre-built binary)
+├─ ports: 8080:8080 (expose API endpoint)
+├─ volumes: endee-data:/data (persistent vector storage)
+├─ restart: unless-stopped (auto-recovery)
+└─ healthcheck: Verifies /api/v1/ping endpoint
+```
+
+### **Endee SDK Integration**
+
+```python
+# How the app connects to Endee:
+
+from endee import Endee
+
+# 1. Initialize client (connects to localhost:8080)
+client = Endee()
+
+# 2. Create/get index
+index = client.create_index(
+    name="code_chunks",
+    dimension=384,
+    space_type="cosine",
+    precision="float32"
+)
+
+# 3. Upsert vectors with metadata
+index.upsert([
+    {
+        "id": "file.py_method_line",
+        "vector": [0.1, 0.2, ..., 0.384],  # 384-dim embedding
+        "meta": {
+            "file_path": "utils.py",
+            "name": "clone_repository",
+            "source_code": "def clone_repository..."
+        }
+    }
+])
+
+# 4. Search for similar code
+results = index.query(
+    vector=question_embedding,
+    top_k=20
+)
+
+# Results: [{id, similarity, meta}, ...]
+```
+
+---
+
 ## 🛠️ Tech Stack
 
 | Component | Technology | Why This Choice |
 |-----------|---|---|
-| **Vector Database** | **Endee** (core) | Native semantic search, aligned with internship |
+| **Vector Database** | **Endee** (Python SDK v0.1.17) | Production-grade semantic search, HNSW optimization, official internship requirement |
+| **Endee Deployment** | Docker + Docker Compose | Isolated container, persistent volume, easy scaling |
 | **Embeddings** | Sentence-Transformers (384-dim) | Fast, free, code-optimized, no API calls |
 | **LLM** | Gemini 2.5 Flash | Fast, free tier, good for RAG |
 | **Code Parser** | Python AST | Precise method extraction, language-native |
 | **Frontend** | Streamlit | Rapid prototyping, deployment-ready |
-| **Storage** | Pickle + JSON | Efficient persistence, no external DB |
 | **Caching** | File-based (SHA256) | Simple, reliable, no cache server needed |
 
 ---
@@ -346,23 +421,32 @@ Endee Search Complexity:
 git clone https://github.com/AyushMishra1006/endee-code-assistant.git
 cd endee-code-assistant
 
-# 2. Create virtual environment
+# 2. Start Endee vector database server
+docker-compose up -d
+# Endee will be running on http://localhost:8080
+# Verify: curl http://localhost:8080/api/v1/ping
+
+# 3. Create virtual environment
 python -m venv venv
 source venv/bin/activate          # macOS/Linux
 # OR
 venv\Scripts\activate             # Windows
 
-# 3. Install dependencies
-pip install -r requirements.txt
+# 4. Install dependencies (includes endee==0.1.17)
+pip install -r code-assistant/requirements.txt
 
-# 4. Set API key
+# 5. Set API key
 export GEMINI_API_KEY="your-api-key-here"
 
-# 5. Run application
+# 6. Run application
+cd code-assistant
 streamlit run app.py
 
-# 6. Open browser
+# 7. Open browser
 # http://localhost:8501
+
+# 8. (Optional) Stop Endee when done
+docker-compose down
 ```
 
 ---
@@ -404,11 +488,13 @@ src/code_parser.py
 └─ Handles: Classes, functions, decorators, docstrings
 
 src/vector_db.py
-├─ VectorDatabase - Endee interface wrapper
-├─ add_chunks() - Index with embeddings
-├─ search() - Cosine similarity ranking
-├─ Persistence via pickle + JSON
-└─ get_vector_db() - Singleton pattern
+├─ VectorDatabase - Endee SDK wrapper (production-grade)
+├─ Uses Endee Python SDK (endee==0.1.17)
+├─ initialize() - Create 384-dim cosine index in Endee
+├─ add_chunks() - Upsert vectors + metadata to Endee
+├─ search() - Query Endee, return top-k by cosine similarity
+├─ Connects to Endee server (http://localhost:8080)
+└─ get_vector_db() - Singleton pattern for connection pooling
 
 src/embeddings.py
 ├─ EmbeddingsGenerator - Sentence-Transformers wrapper
