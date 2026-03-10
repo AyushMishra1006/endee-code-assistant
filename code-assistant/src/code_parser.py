@@ -149,3 +149,4 @@ def chunk_for_storage(chunk: CodeChunk) -> dict:
         "source_code": chunk.source_code,
         "combined_text": combined_text
     }
+#

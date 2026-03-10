@@ -95,3 +95,4 @@ def embed_text(text: str) -> Optional[list[float]]:
 def embed_texts(texts: list[str]) -> list[Optional[list[float]]]:
     """Convenience function to embed multiple texts"""
     return get_embeddings_generator().embed_texts(texts)
+#CHECKING IF GITHUB API WORDS FOR OLD COMMITS
